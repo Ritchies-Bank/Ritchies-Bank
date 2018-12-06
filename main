@@ -1,0 +1,80 @@
+/*Projeto "Ritchie's Bank".
+Equipe: 
+Larissa Roque Carvalho Carvalho
+Marlon Faria Leite
+Paulo Henrique Vieira Morais
+Ronaldo Costa de Freitas*/
+
+#include <stdio.h>
+#include<conio.h>
+#include<windows.h>
+#define EM 3
+
+#define PRETO  0
+#define AZUL 1
+#define VERDE 2
+#define VERDE_AZULADO 3
+#define VERMELHO 4
+#define ROXO 5
+#define AMARELO 6
+#define BRANCO 7
+#define CINZA 8
+#define AZUL_CLARO 9
+#define VERDE_CLARO 10
+#define VERDE_MARINHO 11
+#define VERMELHO_CLARO 12
+#define LILAC 13
+#define AMARELO_CLARO 14
+#define BRANCO_CLARO 15
+
+//string para o arquivo principal
+char* arquivo = "Cds";
+char* arquivo2 = "Extrs";
+
+//strins para a verificação de email
+char* emails[EM]={"@gmail.com","@hotmail.com","@outlook.com"};
+
+//Declaração das funções
+void menu(FILE*);
+void textcolor (int i);
+void quadrado_menor();
+
+int i, x, y;
+
+int main() {
+	//título do programa
+	SetConsoleTitle("Ritchie's Bank");
+	//Dimensões da tela
+	system("mode 120,40");
+	
+	//ponteiro para arquivo
+	FILE *file, *file2;
+	
+	//abre arquivo. Se ouver erro, fecha programa
+	if((file = fopen(arquivo, "ab")) == NULL) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao abrir o arquivo");
+		return 1;
+	}
+	
+	fclose(file);
+	
+	if((file2 = fopen(arquivo2, "ab")) == NULL) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao abrir arquivo");
+		return 1;
+	}
+	
+	fclose(file2);
+	
+	abertura();
+	
+	//chama menu()
+	menu(file);
+	
+	return 0;
+}
