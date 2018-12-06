@@ -1,0 +1,405 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <conio.h>
+#include <string.h>
+#include <time.h>
+#include <windows.h>
+#include <ctype.h>
+#define MAX 100
+#define EM 3
+
+#define PRETO  0
+#define AZUL 1
+#define VERDE 2
+#define VERDE_AZULADO 3
+#define VERMELHO 4
+#define ROXO 5
+#define AMARELO 6
+#define BRANCO 7
+#define CINZA 8
+#define AZUL_CLARO 9
+#define VERDE_CLARO 10
+#define VERDE_MARINHO 11
+#define VERMELHO_CLARO 12
+#define LILAC 13
+#define AMARELO_CLARO 14
+#define BRANCO_CLARO 15
+
+//Variáveis externas globais
+char* emails[EM];
+
+//Definição da struct Tempo
+typedef struct Tempo{
+	int dia, mes, ano;
+	int hora, min;
+}Tempo;
+
+//Definição da struct Extrato
+typedef struct Extrato {
+	double valor;
+	Tempo data; //data da movimentação
+	int id;
+	int conta; //número da conta a que foi feita a transferência
+	int num_conta; //número da conta do dono do extrato
+	char nome[MAX]; //nome do destinatário da transferência
+}Extrato;
+
+//Definição da struct Emprestimo
+typedef struct Emprestimo {
+	Tempo data;
+	double valor; //valor do empréstimo
+	double parcela; //valor da parcela
+	int periodo; //periodo em meses para pagar o empréstimo
+	int totalPagas; //total de parcelas pagas;
+}Emprestimo;
+
+//Definição de struct Cadastro
+typedef struct Cadastro{
+	char nome[MAX];
+	char senha[MAX];
+	char cpf[12];
+	char rg[14];
+	char email[MAX];
+	int num_conta;
+	double saldo;
+	Tempo data;
+	Tempo last_extrato;
+	Tempo last_date; //para o cálculo do rendimento da poupança
+	Extrato extratos; //uma estrutura de dados para os extratos
+	Emprestimo emp; //estrutura de dados para o empréstimo
+	int extr; //número de extratos
+	int transf; //número de transferências
+	int saques;	//número de saques
+	int dep; //número de depósitos
+	int total; //total de movimentações na conta
+	int tipo; //tipo de conta: 0 - poupança, 1 - corrente
+	int emprt; //número de empréstimos	
+}Cad;
+
+//Declaração das funções
+int conta_existente(FILE*, Cad*);
+int conta_inexistente(FILE*, Cad*);
+int cpf_existente(FILE*, Cad*);
+int email_existente(FILE*, Cad*);
+int rg_existente(FILE*, Cad*);
+int senha_correta(const char const*, const char const*);
+int isletter(char);
+int verifica_nome(char[]);
+int verifica_cpf(char[]);
+int verifica_rg(char []);
+int verifica_email(const char[]);
+int verifica_valor(double* num);
+int verifica_saldo(Cad*, double);
+void print_cpf(const char*);
+int verifica_senha(char[]);
+
+int conta_existente(FILE* file, Cad* cad) {
+	
+	//usa fseek para mover ponteiro para o registro desejado
+	fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+	
+	//lê dados
+	fread(cad, sizeof(Cad), 1, file);
+	
+	if(cad->data.ano != 0) {
+		rewind(file);
+		return 1;
+	}
+		
+	else {
+		rewind(file);
+		return 0;
+	}
+}
+
+int cpf_existente(FILE* file, Cad* cad) {
+	Cad aux;
+	int i;
+	
+	rewind(file);
+	
+	while(fread(&aux, sizeof(Cad), 1, file)) {	
+		i = strlen(cad->cpf);
+		
+		if(strncmp(cad->cpf, aux.cpf, i) == 0) {
+			fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+			return 1;
+		}
+	}
+	fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+	return 0;
+}
+
+int conta_inexistente(FILE* file, Cad* cad) {
+	
+	//move ponteiro para a posição desejada
+	fseek(file, (cad->num_conta-1) * sizeof(Cad), SEEK_SET);
+	
+	fread(cad, sizeof(Cad), 1, file);
+	
+	rewind(file);
+	
+	if(cad->data.ano == 0 || strcmp(cad->nome, "") == 0 || strcmp(cad->senha, "") == 0){
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int rg_existente(FILE* file, Cad* cad) {
+	Cad aux;
+	int i;
+	
+	rewind(file);
+	
+	while(fread(&aux, sizeof(Cad), 1, file)) {
+		i = strlen(cad->rg);
+		
+		if(strncmp(cad->rg, aux.rg, i) == 0) {
+			fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+			return 1;
+		}
+	}
+	fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+	return 0;
+}
+
+int verifica_rg(char rg[]) {
+	int i;
+	
+	if(strlen(rg)-1 > 13 || strlen(rg)-1 < 9)
+		return 1;
+	
+	for(i = 0; i < strlen(rg)-1; i++)
+		if(!(isdigit(rg[i])))
+			return 1;
+			
+	return 0;
+}
+
+int senha_correta(const char const* senha1, const char const* senha2) {
+	if(strcmp(senha1, senha2) == 0)
+		return 1;
+	else
+		return 0;
+}
+
+int isletter (char n1){
+	if (isalpha(n1))
+		return 1;
+
+	else{
+		switch (n1){
+			case -96: return 1; //á
+			case -126: return 1; //é
+			case -58: return 1; //ã
+			case -112: return 1; //É
+			case -57: return 1; //Ã
+			case -75: return 1; //Á
+			case -93: return 1; //ú
+			case -23: return 1; //Ú
+			case -94: return 1; //ó
+			case -32: return 1; //Ó
+			case -121: return 1; //ç
+			case 32: return 1; //" "
+			default: return 0;
+		}
+	}
+}
+
+int verifica_nome(char n1[]){
+    int a;
+
+	if(n1[0] == 32 || n1[0] == 10)
+		return -1;
+
+    for (a=0;a<strlen(n1)-1;a++){
+        if ((!isletter(n1[a])))
+            return -1;
+    }
+
+    return 1;
+}
+
+int verifica_cpf(char n1[]){
+	char aux[1]; //String de 1 porque atoi nao converte caracter unico
+	int a,b;
+    int soma=0;
+
+    if (strlen(n1)-1!=11) //verifica se o valor inserido tem 11 caracteres
+        return -1;
+
+    //verifica se todos os caracteres sao digitos
+    for (a=0;a<11;a++){
+        if (!isdigit(n1[a]))
+            return -1;
+    }
+
+    //realiza o calculo de verificacao do primeiro digito verificador
+    for (a=0,b=10;a<9;a++,b--){
+        aux[0]=n1[a];
+
+        soma+=b*atoi(aux);
+    }
+    aux[0]=n1[9];
+
+    if (soma*10%11!=atoi(aux)){
+        if (soma*10%11==10){
+            if (n1[9]!='0')
+                return -1;
+        }
+    }
+    //verificacao para o segundo digito
+    soma=0;
+    for (a=0,b=11;a<10;a++,b--){
+        aux[0]=n1[a];
+
+        soma+=b*atoi(aux);
+    }
+
+    aux[0]=n1[10];
+
+    if (soma*10%11!=atoi(aux)){
+        if (soma*10%11==10){
+            if (n1[10]!='0')
+                return -1;
+        }
+    }
+
+    return 1;
+}
+
+int verifica_email(const char n1[]){
+	char term[MAX]="";
+	int a,tam=strlen(n1)-1,b=0;	
+	int aux=0;
+	
+	for (a=0;a<tam;a++){
+		if (n1[a]=='@')
+			aux=a;
+	}
+	
+	for (a=0;a<tam;a++){
+		if (a!=aux){
+			if (!isdigit(n1[a])&&!isalpha(n1[a])&&n1[a]!='.')
+				return -1;
+		}
+	}
+	
+	for (a=aux;a<tam;a++,b++){
+		term[b]=n1[a];
+	}
+	
+
+	for (a=0;a<EM;a++){
+		if (strcmp(term,emails[a])==0)
+			return 1;
+	}
+	
+	return -1;
+}
+
+int verifica_valor(double* num) {
+	
+	char s[310];
+	int tam, cont = 0, cont_virgulas = 0;
+	int i, x = 0;
+	int x0, y0;
+	
+	fgets(s, 310, stdin);
+	
+	if(s[0] == 32 || s[0] == 10)
+		goto erro;
+	
+	tam = strlen(s) - 1;
+	
+	for(i = 0; i < tam; i++) {
+		if(isdigit(s[i]) == 0 && cont_virgulas == 0) {
+			if(s[i] == ',') {
+				cont_virgulas++;
+				s[i] = '.';
+			}else
+			    if(s[i] != 46) {
+			    	cont++;
+			    }
+		}else
+			if(isdigit(s[i]) == 0 && cont_virgulas > 0) {
+				if(s[i] == ',') {
+					cont++;
+				}
+			}
+	}
+	
+	while(cont > 0) {
+		cont = 0;
+		x = 0;
+		
+		erro:
+		cls();
+		quadrado_menor();
+		x0 = 50; y0 = 19; gotoxy(x0, y0);
+		textcolor(VERMELHO_CLARO);
+		printf("Valor inv%clido", 160);
+		y0 += 2; x0 = 45; gotoxy(x0, y0);
+		printf("Digite o valor novamente");
+		getche();
+		cls();
+		return 1;
+		
+		fgets(s, 310, stdin);
+		
+		if(s[0] == 32 || s[0] == 10)
+			goto erro;
+		
+		tam = strlen(s) - 1;
+		
+		for(i = 0; i < tam; i++) {
+			if(isdigit(s[i]) == 0 && cont_virgulas == 0) {
+				if(s[i] == ',') {
+					cont_virgulas++;
+					s[i] = '.';
+				}else
+			      	if(s[i] != 46) {
+			      		cont++;
+			      	}
+			}else
+				if(isdigit(s[i]) == 0 && cont_virgulas > 0) {
+					if(s[i] == ',') {
+						cont++;
+					}
+				}
+	        }
+	 }
+		
+		*num = atof(s);
+		return 0;
+}
+
+int verifica_saldo(Cad* cad, double valor) {
+	if(valor > cad->saldo)
+		return 1;
+	else
+		return 0;
+}
+
+int email_existente(FILE* file, Cad* cad) {
+	Cad aux;
+	int i;
+	
+	rewind(file);
+	
+	
+	while(fread(&aux, sizeof(Cad), 1, file)) {
+		if((strcmp(cad->email, aux.email) == 0) && (cad->num_conta != aux.num_conta)) {
+			fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+			return 1;
+		}
+	}
+	fseek(file, (cad->num_conta - 1) * sizeof(Cad), SEEK_SET);
+	return 0;
+}
+
+int verifica_senha(char senha[]){
+	if(strlen(senha) < 4) return 1;
+	return 0;
+}
