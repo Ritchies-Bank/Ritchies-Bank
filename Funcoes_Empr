@@ -1,0 +1,309 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <conio.h>
+#include <string.h>
+#include <time.h>
+#include <windows.h>
+#include <ctype.h>
+#include <math.h>
+#define MAX 100
+
+#define PRETO  0
+#define AZUL 1
+#define VERDE 2
+#define VERDE_AZULADO 3
+#define VERMELHO 4
+#define ROXO 5
+#define AMARELO 6
+#define BRANCO 7
+#define CINZA 8
+#define AZUL_CLARO 9
+#define VERDE_CLARO 10
+#define VERDE_MARINHO 11
+#define VERMELHO_CLARO 12
+#define LILAC 13
+#define AMARELO_CLARO 14
+#define BRANCO_CLARO 15
+
+#define CIMA 72
+#define BAIXO 80
+#define ENTER 13
+#define ESQUERDA 75
+#define DIREITA 77
+#define ESC 27
+
+//variável externa globaç
+char *arquivo, *arquivo2;
+
+//Definição da struct Tempo
+typedef struct Tempo{
+	int dia, mes, ano;
+	int hora, min;
+}Tempo;
+
+//Definição da struct Extrato
+typedef struct Extrato {
+	double valor;
+	Tempo data; //data da movimentação
+	int id;
+	int conta; //número da conta a que foi feita a transferência
+	int num_conta; //número da conta do dono do extrato
+	char nome[MAX]; //nome do destinatário da transferência
+}Extrato;
+
+//Definição da struct Emprestimo
+typedef struct Emprestimo {
+	Tempo data;
+	double valor; //valor do empréstimo
+	double parcela; //valor da parcela
+	int periodo; //periodo em meses para pagar o empréstimo
+	int totalPagas; //total de parcelas pagas;
+}Emprestimo;
+
+//Definição de struct Cadastro
+typedef struct Cadastro{
+	char nome[MAX];
+	char senha[MAX];
+	char cpf[12];
+	char rg[14];
+	char email[MAX];
+	int num_conta;
+	double saldo;
+	Tempo data;
+	Tempo last_extrato;
+	Tempo last_date; //para o cálculo do rendimento da poupança
+	Extrato extratos; //uma estrutura de dados para os extratos
+	Emprestimo emp; //estrutura de dados para o empréstimo
+	int extr; //número de extratos
+	int transf; //número de transferências
+	int saques;	//número de saques
+	int dep; //número de depósitos
+	int total; //total de movimentações na conta
+	int tipo; //tipo de conta: 0 - poupança, 1 - corrente
+	int emprt; //número de empréstimos
+}Cad;
+
+//Declaração de funções
+void data_hora(Tempo*);
+double CalculoParcela(double, double, int);
+double j_compostos(double, double, int);
+int CalculoTempo(Tempo, Tempo);
+int Cobrar(FILE*, Cad*);
+int movimentacoes(FILE*);
+
+//variaveis globais
+int x, y, op0;
+char seta;
+
+double CalculoParcela(double valor, double juros, int meses) {
+	return (valor*(juros/(1-pow(1+juros,-meses))));
+}
+
+double j_compostos(double valor, double juros, int tempo) {
+	return (valor * pow(1 + juros, tempo));
+}
+
+int Cobrar(FILE* file, Cad* cad) {
+	if(cad->emprt == 0)
+		return 0;
+	
+	if(cad->emp.totalPagas == cad->emp.periodo) { //se o número de contas pagas é igual ao período do empréstimo 
+		cad->emprt = 0; //o empréstimo foi totalmente pago
+		return 0;
+	}
+	
+	FILE* file2;
+	Tempo atual;
+	int qtdMes = 0, op, total;
+	
+	data_hora(&(atual));
+	
+	qtdMes = (CalculoTempo(cad->emp.data, atual))/30; //quantidade de meses passados desde da data do empréstimo
+	
+	if(qtdMes == 0) {
+		return 0;
+	} else {
+		if(qtdMes == 1) {
+			x = 25; y = 15; gotoxy(x, y);
+			textcolor(VERMELHO_CLARO);
+			printf("Voc%c tem um d%cbito no valor de R$%.2lf referente ao %cltimo empr%cstimo feito\n", 136, 130, cad->emp.parcela, 163, 130);
+			y++; gotoxy(x, y);
+			printf("Deseeja pagar?");
+			op0 = 1; seta = 0;
+			while(seta != ENTER){
+				y = 19; gotoxy(x, y);
+				if(op0 == 1) textcolor(AMARELO_CLARO);
+				if(op0 != 1) textcolor(BRANCO_CLARO);
+				printf("SIM");
+				y+=2; gotoxy(x, y);
+				if(op0 == 2) textcolor(AMARELO_CLARO);
+				if(op0 != 2) textcolor(BRANCO_CLARO);
+				printf("N%cO", 199);
+				seta = getch();
+				switch(seta){
+					case CIMA:
+						op0 = 1;
+					break;
+					
+					case BAIXO:
+						op0 = 2;
+					break;
+					
+					case ENTER: break;
+					
+					default: continue;
+				}
+			}
+			
+			if(op == 2) {
+				cls();
+				return 0;
+			} else {
+				if(op == 1) {
+					cls();
+					if(cad->saldo >= cad->emp.parcela) {
+						cad->saldo -= cad->emp.parcela;
+						cad->emp.totalPagas++;
+						cad->emp.data = atual;
+						cad->total += 1;
+						fwrite(cad,sizeof(Cad),1,file);
+						
+						total = movimentacoes(file); //recebe o total de movimentções do banco
+						
+						//faz novo extrato
+						cad->extratos.id = 6;
+						cad->extratos.data = atual;
+						cad->extratos.num_conta = cad->num_conta;
+						cad->extratos.valor = cad->emp.valor;
+						
+						//salva extrato
+						if((file2 = fopen(arquivo2, "rb+")) == 0) {
+							quadrado_menor();
+							x = 46; y = 20; gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Erro ao reabrir arquivo");
+							exit(1);
+						}
+	
+						fseek(file2, total*sizeof(Extrato), SEEK_SET); //move ponteiro para gravar extrato
+						fwrite(&(cad->extratos), sizeof(Extrato), 1, file2); //grava extrato
+	
+						//fecha arquivo 2
+						fclose(file2);	
+						
+						return 0;
+					} else {
+						cls();
+						textcolor(VERMELHO_CLARO);
+						x = 46; y = 18; gotoxy(x, y);
+						printf("Saldo insuficiente!");
+						x = 30; y+=2; gotoxy(x, y);
+						printf("Fa%ca um dep%csito no valor de R$%.2lf para saldar o debito", 135, 162, cad->emp.parcela);
+						getch();
+						cls();
+					}
+				}
+			}
+		} else {
+			cad->emp.valor = j_compostos(cad->emp.valor, 0.05, cad->emp.periodo);
+			cad->emp.parcela = CalculoParcela(cad->emp.valor, 0.05, cad->emp.periodo);
+			
+			cls();
+			textcolor(VERMELHO_CLARO);
+			x = 22; y = 15; gotoxy(x, y);
+			printf("Voc%c tem um d%cbito no valor de R$%.2lf referente ao %cltimo empr%cstimo feito", 136, 130, cad->emp.parcela*qtdMes, 130, 163);
+			x = 19; y+=2; gotoxy(x, y);
+			printf("Houve atraso de %d m%cs(es) no pagamento, caso nao pague, sua conta sera bloqueada!", qtdMes-1, 136);
+			x = 50; y += 2; gotoxy(x, y);
+			printf("Deseja pagar?");
+			
+			op0 = 1; seta = 0;
+			while(seta != ENTER){
+				x = 55; y = 22; gotoxy(x, y);
+				if(op0 == 1) textcolor(AMARELO_CLARO);
+				if(op0 != 1) textcolor(BRANCO_CLARO);
+				printf("SIM");
+				y+=2; gotoxy(x, y);
+				if(op0 == 2) textcolor(AMARELO_CLARO);
+				if(op0 != 2) textcolor(BRANCO_CLARO);
+				printf("N%cO", 199);
+				seta = getch();
+				switch(seta){
+					case CIMA:
+						op0 = 1;
+					break;
+					
+					case BAIXO:
+						op0 = 2;
+					break;
+					
+					case ENTER: break;
+					
+					default: continue;
+				}
+			}
+			
+			if(op0 == 2) {
+				cls();
+				if(cad->tipo == 0)
+					cad->tipo = 2;
+				else
+					cad->tipo = 3;
+				fwrite(cad, sizeof(Cad),1,file);
+				return 1;
+			} else {
+				if(op0 == 1) {
+					cls();
+					if(cad->saldo >= cad->emp.parcela) {
+						cad->saldo -= cad->emp.parcela*qtdMes;
+						cad->emp.totalPagas += qtdMes;
+						cad->emp.data = atual;
+						cad->total += 1;
+						fwrite(cad,sizeof(Cad),1,file);
+						
+						total = movimentacoes(file); //recebe o total de movimentções do banco
+						
+						//faz novo extrato
+						cad->extratos.id = 6;
+						cad->extratos.data = atual;
+						cad->extratos.num_conta = cad->num_conta;
+						cad->extratos.valor = cad->emp.valor;
+						
+						//salva extrato
+						if((file2 = fopen(arquivo2, "rb+")) == 0) {
+							cls();
+							quadrado_menor();
+							x = 46; y = 20; gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Erro ao reabrir arquivo");
+							exit(1);
+						}
+	
+						fseek(file2, total*sizeof(Extrato), SEEK_SET); //move ponteiro para gravar extrato
+						fwrite(&(cad->extratos), sizeof(Extrato), 1, file2); //grava extrato
+	
+						//fecha arquivo 2
+						fclose(file2);
+						
+						return 0;
+					} else {
+						cls();
+						quadrado_menor();
+						x = 47; y = 20; gotoxy(x, y);
+						textcolor(VERMELHO_CLARO);
+						printf("Saldo insuficiente!");
+						x = 45; y+=2; gotoxy(x, y);
+						printf("Sua conta foi bloqueada!");
+						getche();
+						cls();
+						if(cad->tipo == 0)
+							cad->tipo = 2;
+						else
+							cad->tipo = 3;
+						return 1;
+					}
+				}
+			}
+		}
+	}
+}
