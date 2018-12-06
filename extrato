@@ -1,0 +1,679 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <conio.h>
+#include <string.h>
+#include <time.h>
+#include <windows.h>
+#include <ctype.h>
+#define MAX 100
+
+#define PRETO  0
+#define AZUL 1
+#define VERDE 2
+#define VERDE_AZULADO 3
+#define VERMELHO 4
+#define ROXO 5
+#define AMARELO 6
+#define BRANCO 7
+#define CINZA 8
+#define AZUL_CLARO 9
+#define VERDE_CLARO 10
+#define VERDE_MARINHO 11
+#define VERMELHO_CLARO 12
+#define LILAC 13
+#define AMARELO_CLARO 14
+#define BRANCO_CLARO 15
+
+#define CIMA 72
+#define BAIXO 80
+#define ENTER 13
+#define ESQUERDA 75
+#define DIREITA 77
+#define ESC 27
+
+//Variáveis globais externas
+char *arquivo, *arquivo2;
+
+//Definição da struct Tempo
+typedef struct Tempo{
+	int dia, mes, ano;
+	int hora, min;
+}Tempo;
+
+//Definição da struct Extrato
+typedef struct Extrato {
+	double valor;
+	Tempo data; //data da movimentação
+	int id;
+	int conta; //número da conta a que foi feita a transferência
+	int num_conta; //número da conta do dono do extrato
+	char nome[MAX]; //nome do destinatário da transferência
+}Extrato;
+
+//Definição da struct Emprestimo
+typedef struct Emprestimo {
+	Tempo data;
+	double valor; //valor do empréstimo
+	double parcela; //valor da parcela
+	int periodo; //periodo em meses para pagar o empréstimo
+	int totalPagas; //total de parcelas pagas;
+}Emprestimo;
+
+//Definição de struct Cadastro
+typedef struct Cadastro{
+	char nome[MAX];
+	char senha[MAX];
+	char cpf[12];
+	char rg[14];
+	char email[MAX];
+	int num_conta;
+	double saldo;
+	Tempo data;
+	Tempo last_extrato;
+	Tempo last_date; //para o cálculo do rendimento da poupança
+	Extrato extratos; //uma estrutura de dados para os extratos
+	Emprestimo emp; //estrutura de dados para o empréstimo
+	int extr; //número de extratos
+	int transf; //número de transferências
+	int saques;	//número de saques
+	int dep; //número de depósitos
+	int total; //total de movimentações na conta
+	int tipo; //tipo de conta: 0 - poupança, 1 - corrente
+	int emprt; //número de empréstimos
+}Cad;
+
+//Declaração de funções
+void todos_extratos(FILE*, Cad*);
+void extratos_ano(FILE*, Cad*);
+void extratos_mes(FILE*, Cad*);
+int movimentacoes(FILE*);
+
+//variáveis globais
+int x, y, op0;
+char seta;
+int i;
+
+void todos_extratos(FILE* file, Cad* cad) {
+	//verifica se conta poupança pode fazer extrato
+	if(cad->tipo == 0) {
+		if(cad->extr >= 2) {
+			x = 32; y = 20; gotoxy(x, y);
+			textcolor(VERMELHO_CLARO);
+			printf("Sua conta j%c atingiu o limite mensal de extratos!", 160);
+			getche();
+			cls();
+			return;
+		}
+	}
+	
+	FILE* file2;
+	
+	Extrato extr;
+	
+	if(cad->total == 0) {
+		quadrado_menor();
+		x = 50; y = 20;
+		textcolor(VERMELHO_CLARO);
+		printf("N%co h%c extrato", 198, 160);
+		getche();
+		return;
+	}
+	
+	//salva extrato
+	if((file2 = fopen(arquivo2, "rb+")) == 0) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	i = 0;
+	x = 20; y = 10; gotoxy(x, y);
+	while(fread(&(extr), sizeof(Extrato), 1, file2)) {
+		if(extr.num_conta == cad->num_conta) {
+			if(extr.id == 1) {
+				gotoxy(x, y);
+				textcolor(VERMELHO_CLARO);
+				printf("Movimenta%c%co: Saque\n", 135, 198);
+				y+=3; gotoxy(x, y);
+				textcolor(BRANCO_CLARO);
+				printf("Valor: R$%.2lf\n", extr.valor);
+				y+=2; gotoxy(x, y);
+				printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+				y+=2; gotoxy(x, y);
+				printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+				y+=3;
+				i++;
+				if(i % 2 == 0){
+					x = 8; y = 37; gotoxy(x, y);
+					textcolor(VERDE_MARINHO);
+					printf("Pressione qualquer tecla para continuar;");
+					getch();
+					cls();
+					x = 20; y = 10;
+				}
+			} else {
+				if(extr.id == 2) {
+					gotoxy(x, y);
+					textcolor(VERMELHO_CLARO);
+					printf("Movimenta%c%co: Dep%csito\n", 135, 198, 162);
+					textcolor(BRANCO_CLARO);
+					y+=3; gotoxy(x, y);
+					printf("Valor: R$%.2lf\n", extr.valor);
+					y+=2; gotoxy(x, y);
+					printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+					y+=2; gotoxy(x, y);
+					printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+					y+=3;
+					i++;
+					if(i % 2 == 0){
+						x = 8; y = 37; gotoxy(x, y);
+						textcolor(VERDE_MARINHO);
+						printf("Pressione qualquer tecla para continuar;");
+						getch();
+						cls();
+						x = 20; y = 10;
+					}
+				} else {
+					if(extr.id == 3) {
+						gotoxy(x, y);
+						textcolor(VERMELHO_CLARO);
+						printf("Movimenta%c%co: Transfer%cncia\n", 135, 198, 136);
+						textcolor(BRANCO_CLARO);
+						y+=3; gotoxy(x, y);
+						printf("Valor: R$%.2lf\n", extr.valor);
+						y+=2; gotoxy(x, y);
+						printf("Destinat%crio: %s", 160, extr.nome);
+						y+=2; gotoxy(x, y);
+						printf("Conta: %d\n", extr.conta);
+						y+=2; gotoxy(x, y);
+						printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+						y+=2; gotoxy(x, y);
+						printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+						y+=3;
+						i++;
+						if(i % 2 == 0){
+							x = 8; y = 37; gotoxy(x, y);
+							textcolor(VERDE_MARINHO);
+							printf("Pressione qualquer tecla para continuar;");
+							getch();
+							cls();
+							x = 20; y = 10;
+						}
+					} else {
+						if(extr.id == 4) {
+							gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Movimenta%c%co: Transfer%cncia\n", 135, 198, 136);
+							textcolor(BRANCO_CLARO);
+							y+=3; gotoxy(x, y);
+							printf("Valor: R$%.2lf\n", extr.valor);
+							y+=2; gotoxy(x, y);
+							printf("Remetente: %s", extr.nome);
+							y+=2; gotoxy(x, y);
+							printf("Conta: %d\n", extr.conta);
+							y+=2; gotoxy(x, y);
+							printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+							y+=2; gotoxy(x, y);
+							printf("Hor%crio: %d:%d", 160, extr.data.hora, cad->extratos.data.min);
+							y+=3;
+							i++;
+							if(i % 2 == 0){
+								x = 8; y = 37; gotoxy(x, y);
+								textcolor(VERDE_MARINHO);
+								printf("Pressione qualquer tecla para continuar;");
+								getch();
+								cls();
+								x = 20; y = 10;
+							}
+						} else {
+							gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Movimenta%c%co: Empr%cstimo\n", 135, 198, 130);
+							textcolor(BRANCO_CLARO);
+							y+=2; gotoxy(x, y);
+							printf("Valor: R$%.2lf\n", extr.valor);
+							y+=2; gotoxy(x, y);
+							printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+							y+=2; gotoxy(x, y);
+							printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+							y+=3;
+							i++;
+							if(i % 2 == 0){
+								x = 8; y = 37; gotoxy(x, y);
+								textcolor(VERDE_MARINHO);
+								printf("Pressione qualquer tecla para continuar;");
+								getch();
+								cls();
+								x = 20; y = 10;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	fclose(file2);
+	cls();
+	quadrado_menor();
+	x = 52; y = 20; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Conclu%cdo", 161);
+	getche();
+	cls();
+}
+
+void extratos_ano(FILE* file, Cad* cad) {
+	//verifica se conta poupança pode fazer extrato
+	if(cad->tipo == 0) {
+		if(cad->extr >= 2) {
+			cls();
+			x = 32; y = 20; gotoxy(x, y);
+			textcolor(VERMELHO_CLARO);
+			printf("Sua conta j%c atingiu o limite mensal de extratos!\n", 160);
+			getche();
+			cls();
+			return;
+		}
+	}
+	
+	FILE* file2;
+	
+	Extrato extr;
+	int ano, aux = 0;
+	
+	if(cad->total == 0) {
+		cls();
+		quadrado_menor();
+		x = 50; y = 20;
+		textcolor(VERMELHO_CLARO);
+		printf("N%co h%c extrato\n", 198, 160);
+		getche();
+		cls();
+		return;
+	}
+	
+	erro:
+	cls();
+	quadrado_menor();
+	textcolor(VERMELHO_CLARO);
+	x = 46; y = 20; gotoxy(x, y);
+	printf("Digite o ano desejado:");
+	x = 52; y +=2; gotoxy(x, y);
+	textcolor(BRANCO_CLARO);
+	scanf("%d",&ano);
+	if(ano < 1) {
+		cls();
+		goto erro;
+	}
+	
+	cls();
+	
+	//salva extrato
+	if((file2 = fopen(arquivo2, "rb+")) == 0) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	i = 0;
+	x = 20; y = 10; gotoxy(x, y);
+	while(fread(&(extr), sizeof(Extrato), 1, file2)) {
+		if(extr.num_conta == cad->num_conta) {
+			if(extr.data.ano == ano) {
+				aux++;
+				if(extr.id == 1) {
+					gotoxy(x, y);
+					textcolor(VERMELHO_CLARO);
+					printf("Movimenta%c%co: Saque\n", 135, 198);
+					y+=3; gotoxy(x, y);
+					textcolor(BRANCO_CLARO);
+					printf("Valor: R$%.2lf\n", extr.valor);
+					y+=2; gotoxy(x, y);
+					printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+					y+=2; gotoxy(x, y);
+					printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+					y+=3;
+					i++;
+					if(i % 2 == 0){
+						x = 8; y = 37; gotoxy(x, y);
+						textcolor(VERDE_MARINHO);
+						printf("Pressione qualquer tecla para continuar;");
+						getch();
+						cls();
+						x = 20; y = 10;
+					}
+				} else {
+					if(extr.id == 2) {
+						gotoxy(x, y);
+						textcolor(VERMELHO_CLARO);
+						printf("Movimenta%c%co: Dep%csito", 135, 198, 162);
+						textcolor(BRANCO_CLARO);
+						y+=3; gotoxy(x, y);
+						printf("Valor: R$%.2lf\n", extr.valor);
+						y+=2; gotoxy(x, y);
+						printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+						y+=2; gotoxy(x, y);
+						printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+						y+=3;
+						i++;
+						if(i % 2 == 0){
+							x = 8; y = 37; gotoxy(x, y);
+							textcolor(VERDE_MARINHO);
+							printf("Pressione qualquer tecla para continuar;");
+							getch();
+							cls();
+							x = 20; y = 10;
+						}
+					} else {
+						if(extr.id == 3) {
+							gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Movimenta%c%co: Transfer%cncia\n", 135, 198, 136);
+							textcolor(BRANCO_CLARO);
+							y+=3; gotoxy(x, y);
+							printf("Valor: R$%.2lf\n", extr.valor);
+							y+=2; gotoxy(x, y);
+							printf("Destinat%crio: %s", 160, extr.nome);
+							y+=2; gotoxy(x, y);
+							printf("Conta: %d\n", extr.conta);
+							y+=2; gotoxy(x, y);
+							printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+							y+=2; gotoxy(x, y);
+							printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+							y+=3;
+							i++;
+							if(i % 2 == 0){
+								x = 8; y = 37; gotoxy(x, y);
+								textcolor(VERDE_MARINHO);
+								printf("Pressione qualquer tecla para continuar;");
+								getch();
+								cls();
+								x = 20; y = 10;
+							}
+						} else {
+							if(extr.id == 4) {
+								gotoxy(x, y);
+								textcolor(VERMELHO_CLARO);
+								printf("Movimenta%c%co: Transfer%cncia\n", 135, 198, 136);
+								textcolor(BRANCO_CLARO);
+								y+=3; gotoxy(x, y);
+								printf("Valor: R$%.2lf\n", extr.valor);
+								y+=2; gotoxy(x, y);
+								printf("Remetente: %s", extr.nome);
+								y+=2; gotoxy(x, y);
+								printf("Conta: %d\n", extr.conta);
+								y+=2; gotoxy(x, y);
+								printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+								y+=2; gotoxy(x, y);
+								printf("Hor%crio: %d:%d", 160, extr.data.hora, cad->extratos.data.min);
+								y+=3;
+								i++;
+								if(i % 2 == 0){
+									x = 8; y = 37; gotoxy(x, y);
+									textcolor(VERDE_MARINHO);
+									printf("Pressione qualquer tecla para continuar;");
+									getch();
+									cls();
+									x = 20; y = 10;
+								}
+							} else {
+							gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Movimenta%c%co: Empr%cstimo\n", 135, 198, 130);
+							textcolor(BRANCO_CLARO);
+							y+=2; gotoxy(x, y);
+							printf("Valor: R$%.2lf\n", extr.valor);
+							y+=2; gotoxy(x, y);
+							printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+							y+=2; gotoxy(x, y);
+							printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+							y+=3;
+							i++;
+							if(i % 2 == 0){
+								x = 8; y = 37; gotoxy(x, y);
+								textcolor(VERDE_MARINHO);
+								printf("Pressione qualquer tecla para continuar;");
+								getch();
+								cls();
+								x = 20; y = 10;
+							}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	if(aux == 0){
+		quadrado_menor();
+		textcolor(VERMELHO_CLARO);
+		x = 44; y = 20; gotoxy(x, y);
+		printf("N%co h%c extratos desse ano", 198, 160);
+		getch();
+	}
+	cls();
+	quadrado_menor();
+	x = 52; y = 20; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Conclu%cdo", 161);
+	getche();
+	cls();
+}
+
+void extratos_mes(FILE* file, Cad* cad) {
+	//verifica se conta poupança pode fazer extrato
+	if(cad->tipo == 0) {
+		if(cad->extr >= 2) {
+			cls();
+			x = 32; y = 20; gotoxy(x, y);
+			textcolor(VERMELHO_CLARO);
+			printf("Sua conta j%c atingiu o limite mensal de extratos!", 160);
+			getche();
+			cls();
+			return;
+		}
+	}
+	
+	FILE* file2;
+	
+	Extrato extr;
+	int mes, aux = 0;
+	
+	if(cad->total == 0) {
+		cls();
+		quadrado_menor();
+		x = 50; y = 20;
+		textcolor(VERMELHO_CLARO);
+		printf("N%co h%c extrato\n", 198, 160);
+		getche();
+		return;
+	}
+	
+	erro:
+	cls();
+	quadrado_menor();
+	textcolor(VERMELHO_CLARO);
+	x = 46; y = 20; gotoxy(x, y);
+	printf("Digite o m%cs desejado:", 136);
+	x = 52; y +=2; gotoxy(x, y);
+	textcolor(BRANCO_CLARO);
+	scanf("%d",&mes);
+	if(mes < 1) {
+		cls();
+		goto erro;
+	}
+	
+	cls();
+	
+	//salva extrato
+	if((file2 = fopen(arquivo2, "rb+")) == 0) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	
+	i = 0;
+	x = 20; y = 10; gotoxy(x, y);
+	while(fread(&(extr), sizeof(Extrato), 1, file2)) {
+		if(extr.num_conta == cad->num_conta) {
+			if(extr.data.mes == mes) {
+				aux++;
+				if(extr.id == 1) {
+					gotoxy(x, y);
+					textcolor(VERMELHO_CLARO);
+					printf("Movimenta%c%co: Saque\n", 135, 198);
+					y+=3; gotoxy(x, y);
+					textcolor(BRANCO_CLARO);
+					printf("Valor: R$%.2lf\n", extr.valor);
+					y+=2; gotoxy(x, y);
+					printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+					y+=2; gotoxy(x, y);
+					printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+					y+=3;
+					i++;
+					if(i % 2 == 0){
+						x = 8; y = 37; gotoxy(x, y);
+						textcolor(VERDE_MARINHO);
+						printf("Pressione qualquer tecla para continuar;");
+						getch();
+						cls();
+						x = 20; y = 10;
+					}
+				} else {
+					if(extr.id == 2) {
+						gotoxy(x, y);
+						textcolor(VERMELHO_CLARO);
+						printf("Movimenta%c%co: Dep%csito\n", 135, 198, 162);
+						textcolor(BRANCO_CLARO);
+						y+=3; gotoxy(x, y);
+						printf("Valor: R$%.2lf\n", extr.valor);
+						y+=2; gotoxy(x, y);
+						printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+						y+=2; gotoxy(x, y);
+						printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+						y+=3;
+						i++;
+						if(i % 2 == 0){
+							x = 8; y = 37; gotoxy(x, y);
+							textcolor(VERDE_MARINHO);
+							printf("Pressione qualquer tecla para continuar;");
+							getch();
+							cls();
+							x = 20; y = 10;
+						}
+					} else {
+						if(extr.id == 3) {
+							gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Movimenta%c%co: Transfer%cncia\n", 135, 198, 136);
+							textcolor(BRANCO_CLARO);
+							y+=3; gotoxy(x, y);
+							printf("Valor: R$%.2lf\n", extr.valor);
+							y+=2; gotoxy(x, y);
+							printf("Destinat%crio: %s", 160, extr.nome);
+							y+=2; gotoxy(x, y);
+							printf("Conta: %d\n", extr.conta);
+							y+=2; gotoxy(x, y);
+							printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+							y+=2; gotoxy(x, y);
+							printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+							y+=3;
+							i++;
+							if(i % 2 == 0){
+								x = 8; y = 37; gotoxy(x, y);
+								textcolor(VERDE_MARINHO);
+								printf("Pressione qualquer tecla para continuar;");
+								getch();
+								cls();
+								x = 20; y = 10;
+							}
+						} else {
+							if(extr.id == 4) {
+								gotoxy(x, y);
+								textcolor(VERMELHO_CLARO);
+								printf("Movimenta%c%co: Transfer%cncia\n", 135, 198, 136);
+								textcolor(BRANCO_CLARO);
+								y+=3; gotoxy(x, y);
+								printf("Valor: R$%.2lf\n", extr.valor);
+								y+=2; gotoxy(x, y);
+								printf("Remetente: %s", extr.nome);
+								y+=2; gotoxy(x, y);
+								printf("Conta: %d\n", extr.conta);
+								y+=2; gotoxy(x, y);
+								printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+								y+=2; gotoxy(x, y);
+								printf("Hor%crio: %d:%d", 160, extr.data.hora, cad->extratos.data.min);
+								y+=3;
+								i++;
+								if(i % 2 == 0){
+									x = 8; y = 37; gotoxy(x, y);
+									textcolor(VERDE_MARINHO);
+									printf("Pressione qualquer tecla para continuar;");
+									getch();
+									cls();
+									x = 20; y = 10;
+								}
+							} else {
+							gotoxy(x, y);
+							textcolor(VERMELHO_CLARO);
+							printf("Movimenta%c%co: Empr%cstimo\n", 135, 198, 130);
+							textcolor(BRANCO_CLARO);
+							y+=2; gotoxy(x, y);
+							printf("Valor: R$%.2lf\n", extr.valor);
+							y+=2; gotoxy(x, y);
+							printf("Data: %d/%d/%d\n", extr.data.dia, extr.data.mes, extr.data.ano);
+							y+=2; gotoxy(x, y);
+							printf("Hor%crio: %d:%d", 160, extr.data.hora, extr.data.min);
+							y+=3;
+							i++;
+							if(i % 2 == 0){
+								x = 8; y = 37; gotoxy(x, y);
+								textcolor(VERDE_MARINHO);
+								printf("Pressione qualquer tecla para continuar;");
+								getch();
+								cls();
+								x = 20; y = 10;
+							}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	if(aux == 0){
+		cls();
+		quadrado_menor();
+		textcolor(VERMELHO_CLARO);
+		x = 44; y = 20; gotoxy(x, y);
+		printf("N%co h%c extratos desse m%cs", 198, 160, 136);
+	}
+	fclose(file);
+	cls();
+	quadrado_menor();
+	x = 52; y = 20; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Conclu%cdo", 161);
+	getche();
+	cls();
+}
+
+int movimentacoes(FILE* file) {
+	Cad cad;
+	int i;
+	
+	rewind(file);
+	
+	while(fread(&cad,sizeof(Cad),1,file)) {
+		i += cad.total;
+	}
+	
+	return i;
+}
