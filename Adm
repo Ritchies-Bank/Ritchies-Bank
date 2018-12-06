@@ -1,0 +1,690 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <conio.h>
+#include <string.h>
+#include <time.h>
+#include <windows.h>
+#include <ctype.h>
+#define MAX 100
+
+#define PRETO  0
+#define AZUL 1
+#define VERDE 2
+#define VERDE_AZULADO 3
+#define VERMELHO 4
+#define ROXO 5
+#define AMARELO 6
+#define BRANCO 7
+#define CINZA 8
+#define AZUL_CLARO 9
+#define VERDE_CLARO 10
+#define VERDE_MARINHO 11
+#define VERMELHO_CLARO 12
+#define LILAC 13
+#define AMARELO_CLARO 14
+#define BRANCO_CLARO 15
+
+#define CIMA 72
+#define BAIXO 80
+#define ENTER 13
+#define ESQUERDA 75
+#define DIREITA 77
+#define ESC 27
+//Variáveis globais externas
+char *arquivo, *arquivo2;
+
+//Definição da struct Tempo
+typedef struct Tempo{
+	int dia, mes, ano;
+	int hora, min;
+}Tempo;
+
+//Definição da struct Extrato
+typedef struct Extrato {
+	double valor;
+	Tempo data; //data da movimentação
+	int id;
+	int conta; //número da conta a que foi feita a transferência
+	int num_conta; //número da conta do dono do extrato
+	char nome[MAX]; //nome do destinatário da transferência
+}Extrato;
+
+//Definição da struct Emprestimo
+typedef struct Emprestimo {
+	Tempo data;
+	double valor; //valor do empréstimo
+	double parcela; //valor da parcela
+	int periodo; //periodo em meses para pagar o empréstimo
+	int totalPagas; //total de parcelas pagas;
+}Emprestimo;
+
+//Definição de struct Cadastro
+typedef struct Cadastro{
+	char nome[MAX];
+	char senha[MAX];
+	char cpf[12];
+	char rg[14];
+	char email[MAX];
+	int num_conta;
+	double saldo;
+	Tempo data;
+	Tempo last_extrato;
+	Tempo last_date; //para o cálculo do rendimento da poupança
+	Extrato extratos; //uma estrutura de dados para os extratos
+	Emprestimo emp; //estrutura de dados para o empréstimo
+	int extr; //número de extratos
+	int transf; //número de transferências
+	int saques;	//número de saques
+	int dep; //número de depósitos
+	int total; //total de movimentações na conta
+	int tipo; //tipo de conta: 0 - poupança, 1 - corrente
+	int emprt; //número de empréstimos
+}Cad;
+
+//Declaração de funções
+void ContaAdm(FILE*);
+void ContasAdm(FILE*);
+Cad* GuardaContas(FILE*);
+void ordenaAlpha(Cad*, int);
+void ordenaData(Cad*, int);
+void ordenaSaldo(Cad*, int);
+void troca(Cad*, Cad*);
+int comparaData(Tempo, Tempo);
+int comparaNome(Cad, Cad);
+int total(FILE*);
+int conta_inexistente(FILE*, Cad*);
+void print_cpf(const char*);
+void atualizaAdm(FILE*, Cad*);
+void Desbloquear(Cad*);
+void excluir(FILE*, int);
+
+//variaveis globais
+int x, y, op0;
+char seta;
+
+void ContaAdm(FILE* file) {
+	Cad cad;
+	int op;
+	
+	//Abre arquivo. Se houver erro, fecha programa
+	if((file = fopen(arquivo, "rb+")) == NULL) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	
+	erro:
+	cls();
+	quadrado_menor();
+	x = 45; y = 19; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Digite o n%cmero da conta:", 163);
+	x = 50; y = 22; gotoxy(x, y);
+	textcolor(BRANCO_CLARO);
+	printf("%c%c%c%c%c%c%c%c%c%c%c%c%c", 218, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 191);
+	y++;
+	gotoxy(x, y);
+	printf("%c           %c", 179, 179);
+	y++;
+	gotoxy(x, y);
+	printf("%c%c%c%c%c%c%c%c%c%c%c%c%c", 192, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 217);
+	x = 51; y = 23; gotoxy(x, y);
+	textcolor(BRANCO_CLARO);
+	scanf("%d", &cad.num_conta);
+	if(cad.num_conta < 1) {
+		system("cls");
+		goto erro;
+	}
+	
+	if(conta_inexistente(file, &cad)) {
+		cls();
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Essa conta n%co existe!\n", 198);
+		getche();
+		system("cls");
+		goto erro;
+	}	
+	
+	//usa fseek para mover ponteiro para o registro desejado
+	fseek(file, (cad.num_conta - 1) * sizeof(Cad), SEEK_SET);
+
+	//le registro
+	fread(&cad, sizeof(Cad), 1, file);
+	fclose(file);
+	
+	do{
+		cls();
+		//imprime dados
+		x = 55; y = 4; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Dados");
+	
+		x = 15; y = 10; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Nome: "); textcolor(BRANCO_CLARO); printf("%s", cad.nome);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("CPF: "); textcolor(BRANCO_CLARO); print_cpf(cad.cpf);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("RG: "); textcolor(BRANCO_CLARO); printf("%s", cad.rg);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Email: "); textcolor(BRANCO_CLARO); printf("%s", cad.email);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Saldo: "); textcolor(BRANCO_CLARO); printf("R$%.2lf", cad.saldo);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Senha "); textcolor(BRANCO_CLARO); printf("%s", cad.senha);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Cadastrou em: %d/%d/%d %cs %d:%d", cad.data.dia, cad.data.mes, cad.data.ano, 133, cad.data.hora, cad.data.min);
+		
+		//divisória da tela
+		int i;
+		x = 65; y = 8;
+		textcolor(BRANCO_CLARO);
+		for(i = 0; i < 24; i ++){
+			gotoxy(x, y);
+			printf("%c", 186);
+			y++;
+		}
+	
+		op0 = 1;
+		x = 80; y = 10; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Op%c%ces", 135, 228);
+		do {
+			retorno:
+			x = 70; y = 13; gotoxy(x, y);
+			if(op0 == 1) textcolor(AMARELO_CLARO);
+			if(op0 != 1) textcolor(BRANCO_CLARO);
+			printf("%c Atualizar", 254);
+			y+=2; gotoxy(x, y);
+			if(op0 == 2) textcolor(AMARELO_CLARO);
+			if(op0 != 2) textcolor(BRANCO_CLARO);
+			printf("%c Desbloquear", 254);
+			y+=2; gotoxy(x, y);
+			if(op0 == 3) textcolor(AMARELO_CLARO);
+			if(op0 != 3) textcolor(BRANCO_CLARO);
+			printf("%c Excluir", 254);
+			y+=2; gotoxy(x, y);
+			if(op0 == 4) textcolor(AMARELO_CLARO);
+			if(op0 != 4) textcolor(BRANCO_CLARO);
+			printf("%c Sair", 254);
+			seta = getch();
+			switch(seta){
+				case CIMA:
+					op0--; if(op0 == 0) op0 = 1;
+					goto retorno;
+				break;
+				
+				case BAIXO:
+					op0++; if(op0 == 5) op0 = 4;
+					goto retorno;
+				break;
+				
+				case ENTER:
+					break;
+					
+				default: goto retorno;
+			}
+		
+			cls();
+		
+			switch(op0) {
+				case 1: atualizaAdm(file, &cad); break;
+				case 2: Desbloquear(&cad); break;
+				case 3: excluir(file, cad.num_conta); return; break;
+				case 4: cls(); return;
+			}
+			
+			//Abre arquivo. Se houver erro, fecha programa
+			if((file = fopen(arquivo, "rb+")) == NULL) {
+				quadrado_menor();
+				x = 46; y = 20; gotoxy(x, y);
+				textcolor(VERMELHO_CLARO);
+				printf("Erro ao reabrir arquivo");
+					exit(1);
+			}
+					
+			//usa fseek para mover ponteiro para o registro desejado
+			fseek(file, (cad.num_conta - 1) * sizeof(Cad), SEEK_SET);
+	
+			//le registro
+			fread(&cad, sizeof(Cad), 1, file);
+			fclose(file);
+			cls();
+		}while(seta != 13);
+	}while(1);
+}
+
+void ContasAdm(FILE* file) {
+	int t = 0, a, opc;
+	
+	Cad *cads;
+	cls();
+	op0 = 1; seta = 0;
+	x = 45; y = 15; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf ("Insira a op%c%co desejada", 135, 198);
+	
+	while(seta != ENTER){
+		y = 18; x = 40;
+		if(op0 == 1) textcolor(AMARELO_CLARO);
+		if(op0 != 1) textcolor(BRANCO_CLARO);
+		gotoxy(x, y);
+		printf ("%c Ver contas em ordem alfab%ctica", 254, 130);
+		if(op0 == 2) textcolor(AMARELO_CLARO);
+		if(op0 != 2) textcolor(BRANCO_CLARO);
+		y+=2; gotoxy(x, y);
+		printf ("%c Ver contas em ordem de cadastro", 254);
+		if(op0 == 3) textcolor(AMARELO_CLARO);
+		if(op0 != 3) textcolor(BRANCO_CLARO);
+		y+=2; gotoxy(x, y);
+		printf ("%c Ver contas em ordem de saldo", 254);
+		seta = getch();
+		
+		switch(seta){
+			case CIMA:
+				op0--;
+				if(op0 == 0) op0 = 3;
+			break;
+			
+			case BAIXO:
+				op0++;
+				if(op0 == 4) op0 = 1;
+			break;
+			
+			case ENTER: break;
+			
+			default: continue;
+		}
+	}
+	
+	t = total(file);
+	
+	cads = (Cad*) calloc(t, sizeof(Cad));
+	
+	cads = GuardaContas(file);
+
+	switch(op0){
+		case 1: ordenaAlpha(cads,t); break;
+		case 2: ordenaData(cads,t); break;
+		case 3: ordenaSaldo(cads,t); break;
+	}
+
+	for (a=0;a<t;a++) {
+		cls();
+		//imprime dados
+	
+		x = 15; y = 10; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Nome: "); textcolor(BRANCO_CLARO); printf("%s", cads[a].nome);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("CPF: "); textcolor(BRANCO_CLARO); print_cpf(cads[a].cpf);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("RG: "); textcolor(BRANCO_CLARO); printf("%s", cads[a].rg);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Email: "); textcolor(BRANCO_CLARO); printf("%s", cads[a].email);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Saldo: "); textcolor(BRANCO_CLARO); printf("R$%.2lf", cads[a].saldo);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Senha "); textcolor(BRANCO_CLARO); printf("%s", cads[a].senha);
+		y+=3; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Cadastrou em: %d/%d/%d %cs %d:%d", cads[a].data.dia, cads[a].data.mes, cads[a].data.ano, 133, cads[a].data.hora, cads[a].data.min);
+		x = 8; y = 37; gotoxy(x, y);
+		textcolor(VERDE_MARINHO);
+		printf("Pressione qualquer tecla para continuar;");
+		getch();
+	}
+	
+	free(cads);
+	cls();
+	quadrado_menor();
+	x = 52; y = 20; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Conclu%cdo", 161);
+	getche();
+	cls();
+}
+
+Cad* GuardaContas(FILE* file) {
+	int tam = 0;
+	int i = 0, a;
+	
+	Cad cad, *vetor;
+	
+	if((file = fopen(arquivo, "rb+")) == NULL) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	
+	//calcula a quantidade de contas
+	while((fread(&cad, sizeof(Cad), 1, file))) {
+		tam++;
+	}
+	
+	//aloca tamanho necessário para as contas
+	vetor = (Cad*) calloc(tam, sizeof(Cad));
+	
+	//volta para a posição inicial do arquivo
+	rewind(file);
+	
+	//guarda as estruturas em vetor dinamicamente alocado
+	while((fread(&cad, sizeof(Cad), 1, file))) {
+			vetor[i] = cad;
+			i++;	
+	}
+	
+	//fecha arquivo
+	fclose(file);
+	
+	return vetor;
+}
+
+void ordenaAlpha(Cad* cad, int tam) {
+	int i, j, aux;
+	
+	for(i = 1; i < tam; i++){ 
+		j = i; 
+		while((j > 0) && (comparaNome(cad[j],cad[j-1])==-1)){ 
+			troca(&cad[j],&cad[j-1]); 
+      		j--;    
+		} 
+  	} 
+}
+
+void ordenaData(Cad* cad, int tam) {
+	int i, j, aux; 
+ 
+	for(i = 1; i < tam; i++){ 
+		j = i; 
+		while((j > 0) && (comparaData(cad[j].data,cad[j-1].data)==-1)){ 
+			troca(&cad[j],&cad[j-1]); 
+      		j--;    
+		} 
+  	} 
+}
+
+void ordenaSaldo(Cad* cad, int tam) {
+	int i, j, aux; 
+ 
+	for(i = 1; i < tam; i++){ 
+		j = i; 
+		while((j > 0) && (cad[j].saldo>cad[j-1].saldo)){ 
+			troca(&cad[j],&cad[j-1]); 
+      		j--;
+		} 
+  	} 
+}
+
+void troca(Cad *n1, Cad *n2){
+	Cad aux;
+	
+	aux=*n2;
+	*n2=*n1;
+	*n1=aux;
+}
+
+int comparaData(Tempo n1, Tempo n2) {
+	if (n1.ano>n2.ano) {
+		return 1;
+	} else {
+		if (n2.ano>n1.ano)
+				return -1;
+		else{
+			if (n1.mes>n2.mes)
+				return 1;	
+			else{ 
+				if (n2.mes>n1.mes)
+					return -1;
+				else{
+					if (n1.dia>n2.dia)
+						return 1;
+					else
+						return -1;	
+				}
+			}	
+		}	
+	}
+}
+
+int comparaNome(Cad n1, Cad n2) {
+	if (strcmp(n1.nome,n2.nome)>0)
+		return 1;	
+	else
+		return -1;	
+}
+
+int total(FILE *file){
+	int tam=0;
+	
+	Cad cad;
+	
+	if((file = fopen(arquivo, "rb+")) == NULL) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	
+	//calcula a quantidade de contas
+	while((fread(&cad, sizeof(Cad), 1, file))) {
+		tam++;
+	}
+	
+	fclose(file);
+	
+	return tam;
+}
+
+void atualizaAdm(FILE* file, Cad* cad) {
+	//Declaração de funções
+	int verifica_email(char[]);
+	void inicializa_string(char[], int);
+	
+	if((file = fopen(arquivo, "rb+")) == 0) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Erro ao reabrir arquivo");
+		exit(1);
+	}
+	
+	fseek(file, (cad->num_conta-1) * sizeof(Cad), SEEK_SET);
+	
+	inicializa_string(cad->email, strlen(cad->email));
+	
+	//faz atualização
+	erro_email:
+	x = 26; y = 24; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf ("Senha: ");
+	y++; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("________________________");
+	x = 26; y = 20; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf ("Digite um novo email: ");
+	y++; gotoxy(x, y);
+	printf("________________________");
+	x = 48; y = 20; gotoxy(x, y);
+	textcolor(BRANCO_CLARO);
+	fflush(stdin);
+	fgets(cad->email,MAX,stdin);
+	fflush(stdin);
+	
+	while(verifica_email(cad->email)==-1){
+		cls();
+		x = 26; y = 24; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf ("Senha: ");
+		y++; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("________________________");
+		x = 26; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf ("Digite um email v%clido: ", 160);
+		y++; gotoxy(x, y);
+		printf("________________________");
+		x = 50; y = 20; gotoxy(x, y);
+		textcolor(BRANCO_CLARO);
+		fgets(cad->email,MAX,stdin);
+		fflush(stdin);
+	}
+	
+	if(email_existente(file, cad)) {
+		quadrado_menor();
+		x = 46; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Email j%c cadastrado!", 160);
+		getche();
+		cls();
+		goto erro_email;
+	}
+	
+	cls();
+		
+	le_senha_atualizar(cad->senha,cad,1);
+	
+	fseek(file, (cad->num_conta-1) * sizeof(Cad), SEEK_SET);
+	fwrite(cad, sizeof(Cad), 1, file);
+	
+	fclose(file);
+	
+	puts("");
+	cls();
+	quadrado_menor();
+	x = 52; y = 20; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Conclu%cdo", 161);
+	getche();
+	cls();
+}
+
+void Desbloquear(Cad* cad) {
+	double CalculoParcela(double, double, int);
+	
+	int op;
+	
+	if(cad->tipo == 0 || cad->tipo == 1) {
+		quadrado_menor();
+		x = 43; y = 20; gotoxy(x, y);
+		textcolor(VERMELHO_CLARO);
+		printf("Cliente n%co est%c bloqueado!", 198, 160);
+		getche();
+		cls();
+		return;
+	}
+	
+	cls();
+	x  = 10; y = 10; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Nome: "); textcolor(PRETO); printf("%s", cad->nome);
+	y+=2; gotoxy(x, y);
+	textcolor(VERMELHO_CLARO);
+	printf("Situa%c%co: cliente est%c com um d%cbito no valor de ", 135, 198, 160, 130); textcolor(BRANCO_CLARO); printf("R$%.2lf", cad->emp.valor);
+	x = 10;y += 3; gotoxy(x, y); textcolor(VERMELHO_CLARO);
+	printf("Deseja desbloquea-lo? (Obs: ao desbloquear, o saldo do cliente sera utilizado, e o restante do debito");
+	y++; gotoxy(x, y);
+	printf("ira ser comprado no proximo mes)");
+	
+	op0 = 1; seta = 0;
+			while(seta != ENTER){
+				x = 55; y = 20; gotoxy(x, y);
+				if(op0 == 1) textcolor(VERMELHO_CLARO);
+				if(op0 != 1) textcolor(BRANCO_CLARO);
+				printf("%c%c%c%c%c%c%c%c%c%c%c%c%c", 218, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 191);
+				y++;
+				gotoxy(x, y);
+				printf("%c    SIM    %c", 179, 179);
+				y++;
+				gotoxy(x, y);
+				printf("%c%c%c%c%c%c%c%c%c%c%c%c%c", 192, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 217);
+				y+=2; gotoxy(x, y);
+				if(op0 == 2) textcolor(VERMELHO_CLARO);
+				if(op0 != 2) textcolor(BRANCO_CLARO);
+				printf("%c%c%c%c%c%c%c%c%c%c%c%c%c", 218, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 191);
+				y++;
+				gotoxy(x, y);
+				printf("%c    N%cO    %c", 179, 199, 179);
+				y++;
+				gotoxy(x, y);
+				printf("%c%c%c%c%c%c%c%c%c%c%c%c%c", 192, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 196, 217);
+				seta = getch();
+				switch(seta){
+					case CIMA:
+						op0 = 1;
+					break;
+					
+					case BAIXO:
+						op0 = 2;
+					break;
+					
+					case ENTER: break;
+					
+					default: continue;
+				}
+			}
+	
+	if(op0 == 2) {
+		return;
+	} else {
+		if(op0 == 1) {
+			cad->emp.valor -= cad->saldo;
+			cad->saldo -= cad->emp.valor;
+			if(cad->saldo <= 0.0) {
+				cad->saldo = 0.0;
+			}
+			
+			if(cad->emp.valor <= 0.0) {
+				cad->emp.totalPagas = cad->emp.periodo;
+				if(cad->tipo == 2) {
+					cad->tipo = 0;
+				} else {
+					cad->tipo = 1;
+				}
+				cls();
+				quadrado_menor();
+				x = 51; y = 20; gotoxy(x, y);
+				textcolor(VERMELHO_CLARO);
+				printf("D%cbito pago\n", 130);
+				getche();
+				cls();
+			} else {
+				cad->emp.parcela = CalculoParcela(cad->emp.valor, 0.05, cad->emp.periodo);
+				if(cad->tipo == 2) {
+					cad->tipo = 0;
+				} else {
+					cad->tipo = 1;
+				}
+				cls();
+				quadrado_menor();
+				x = 50; y = 20; gotoxy(x, y);
+				textcolor(VERMELHO_CLARO);
+				printf("Situa%c%co final:", 135, 198);
+				y+=2; gotoxy(x, y);
+				textcolor(BRANCO_CLARO);
+				printf("%dX de R$%.2lf", cad->emp.periodo, cad->emp.parcela);
+				getche();
+				cls();
+			}
+		}
+	}
+}
